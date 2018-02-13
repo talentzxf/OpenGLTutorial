@@ -20,30 +20,86 @@ class Lesson1Renderer implements GLSurfaceView.Renderer {
     private float[] mViewMatrix = new float[16];
     private float[] mProjectionMatrix = new float[16];
 
+    private float[] lightPos = {
+            0.0f, 0.0f, 5.0f, 1.0f
+    };
+
     private float[] vertices = {
             1.0f, 0.0f, 0.0f,
             -1.0f, 0.0f, 0.0f,
-            0.0f, 1.0f, 0.0f
+            0.0f, 1.0f, 0.0f,
+
+            2.0f, 0.0f, -1.0f,
+            -2.0f, 0.0f, -1.0f,
+            0.0f, 2.0f, -1.0f
     };
 
+    private float[] colors = {
+            1.0f, 0.0f, 0.0f,
+            1.0f, 0.0f, 0.0f,
+            1.0f, 0.0f, 0.0f,
+
+            0.0f, 1.0f, 0.0f,
+            0.0f, 1.0f, 0.0f,
+            0.0f, 1.0f, 0.0f,
+    };
+
+    private float[] normals = {
+            0.0f, 0.0f, 1.0f,
+            0.0f, 0.0f, 1.0f,
+            0.0f, 0.0f, 1.0f,
+
+            0.0f, 0.0f, 1.0f,
+            0.0f, 0.0f, 1.0f,
+            0.0f, 0.0f, 1.0f,
+    };
+
+    // Vertex Shader作用在顶点上
     private String vertexShader ="precision mediump float;" +
-            "uniform mat4 u_MVPMatrix;" + //从外部输入，对所有顶点一样的矩阵
+            "uniform mat4 u_MMatrix;" + //从外部输入，对所有顶点一样的矩阵
+            "uniform mat4 u_VMatrix;" + //从外部输入，对所有顶点一样的矩阵
+            "uniform mat4 u_PMatrix;" + //从外部输入，对所有顶点一样的矩阵
             "attribute vec4 a_Position;" + //从外部输入，对每个定点不一样，每个定点的位置
+            "attribute vec4 a_Color;" + //从外部输入，对每个顶点不一样，每个顶点的颜色
+            "attribute vec4 a_Normal;" +
+            "varying vec4 v_Color;"+ // 在VertexShader和Fragment Shader之间传值
+            "varying vec4 v_Position;" +
+            "varying vec4 v_Normal;" +
             "void main(){" +
-            "gl_Position = u_MVPMatrix * a_Position;" + // 输出，在屏幕上的坐标
+            "gl_Position = u_PMatrix * u_VMatrix * u_MMatrix * a_Position;" + // 输出，在屏幕上的坐标
+            "v_Color = a_Color;" + // 不是简单的赋值，插值
+            "v_Position = gl_Position;" + //世界空间坐标
+            "v_Normal = u_MMatrix * a_Normal;" + //世界空间法向量
             "}";
 
+    // Fragment Shader作用在每个像素点上的
     private String fragmentShader = "precision mediump float;" +
+            "uniform vec4 u_lightPos;" +
+            "varying vec4 v_Color;" +
+            "varying vec4 v_Position;" +
+            "varying vec4 v_Normal;" +
             "void main(){" +
-            "gl_FragColor = vec4(1.0,0.0,0.0,1.0);" + //输出，每个定点在屏幕上的颜色
+            "float I = dot(normalize(v_Position - u_lightPos),normalize(v_Normal));" +
+            "gl_FragColor = I * v_Color;" + //输出，每个定点在屏幕上的颜色
             "}";
     private int mProgramHandler = -1;
     private FloatBuffer mPositionBuffer;
+    private FloatBuffer mColorBuffer;
+    private FloatBuffer mNormalBuffer;
+    private long startTime = -1;
 
     Lesson1Renderer(){
         mPositionBuffer = ByteBuffer.allocateDirect(vertices.length * 4)
                 .order(ByteOrder.nativeOrder()).asFloatBuffer();
         mPositionBuffer.put(vertices).position(0);
+
+        mColorBuffer = ByteBuffer.allocateDirect(colors.length * 4)
+                .order(ByteOrder.nativeOrder()).asFloatBuffer();
+        mColorBuffer.put(colors).position(0);
+
+        mNormalBuffer = ByteBuffer.allocateDirect(normals.length * 4)
+                .order(ByteOrder.nativeOrder()).asFloatBuffer();
+        mNormalBuffer.put(normals).position(0);
     }
 
     void compileShaders(String vertexShader, String fragmentShader){
@@ -81,6 +137,7 @@ class Lesson1Renderer implements GLSurfaceView.Renderer {
                 lookX,lookY,lookZ,upX,upY,upZ);
 
         compileShaders(vertexShader, fragmentShader);
+        startTime = System.currentTimeMillis();
     }
 
     @Override
@@ -105,22 +162,35 @@ class Lesson1Renderer implements GLSurfaceView.Renderer {
 
     @Override
     public void onDrawFrame(GL10 gl) {
-        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
+
+        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
+        GLES20.glEnable(GLES20.GL_DEPTH_TEST);
 
         GLES20.glUseProgram(mProgramHandler);
 
         // model matrix
         float[] modelMatrix = new float[16];
         Matrix.setIdentityM(modelMatrix,0);
+        long elapsedTime = System.currentTimeMillis() - startTime;
+        Matrix.rotateM(modelMatrix,0,elapsedTime/10.0f, 1.0f,1.0f,0.0f);
 
-        // mvpMatrix = p*v*m
-        float[] mvpMatrix = new float[16];
-        Matrix.multiplyMM(mvpMatrix,0,mViewMatrix,0,modelMatrix,0) ;  // v*m
-        Matrix.multiplyMM(mvpMatrix,0,mProjectionMatrix, 0,mvpMatrix,0); // p*v*m
+//        // mvpMatrix = p*v*m
+//        float[] mvpMatrix = new float[16];
+//        Matrix.multiplyMM(mvpMatrix,0,mViewMatrix,0,modelMatrix,0) ;  // v*m
+//        Matrix.multiplyMM(mvpMatrix,0,mProjectionMatrix, 0,mvpMatrix,0); // p*v*m
 
         // 把mvpMatrix 传给u_MVPMatrix
-        int mvpMatrixHandler = GLES20.glGetUniformLocation(mProgramHandler, "u_MVPMatrix");
-        GLES20.glUniformMatrix4fv(mvpMatrixHandler,1,false,mvpMatrix,0);
+        int mvpMatrixHandler = GLES20.glGetUniformLocation(mProgramHandler, "u_MMatrix");
+        GLES20.glUniformMatrix4fv(mvpMatrixHandler,1,false,modelMatrix,0);
+
+        int vMatrixHandler = GLES20.glGetUniformLocation(mProgramHandler, "u_VMatrix");
+        GLES20.glUniformMatrix4fv(vMatrixHandler,1,false,mViewMatrix,0);
+
+        int pMatrixHandler = GLES20.glGetUniformLocation(mProgramHandler, "u_PMatrix");
+        GLES20.glUniformMatrix4fv(pMatrixHandler,1,false,mProjectionMatrix,0);
+
+        int lightPosHandler = GLES20.glGetUniformLocation(mProgramHandler,"u_lightPos");
+        GLES20.glUniform4fv(lightPosHandler,1,lightPos,0);
 
         // 把定点数组赋给a_Position
         int positionHandler = GLES20.glGetAttribLocation(mProgramHandler,"a_Position");
@@ -128,9 +198,21 @@ class Lesson1Renderer implements GLSurfaceView.Renderer {
         GLES20.glVertexAttribPointer(positionHandler,3,GLES20.GL_FLOAT,false,3*4,
                 mPositionBuffer);
         GLES20.glEnableVertexAttribArray(positionHandler);
+
+        int colorHandler = GLES20.glGetAttribLocation(mProgramHandler,"a_Color");
+        GLES20.glVertexAttribPointer(colorHandler,3,GLES20.GL_FLOAT,false,3*4,
+                mColorBuffer);
+        GLES20.glEnableVertexAttribArray(colorHandler);
+
+        int normalHandler = GLES20.glGetAttribLocation(mProgramHandler,"a_Normal");
+        GLES20.glVertexAttribPointer(normalHandler,3,GLES20.GL_FLOAT,false,3*4,
+                mNormalBuffer);
+        GLES20.glEnableVertexAttribArray(normalHandler);
+
         GLES20.glDrawArrays(GLES20.GL_TRIANGLES,0,vertices.length/3);
 
         GLES20.glDisableVertexAttribArray(positionHandler);
-
+        GLES20.glDisableVertexAttribArray(colorHandler);
+        GLES20.glDisableVertexAttribArray(normalHandler);
     }
 }

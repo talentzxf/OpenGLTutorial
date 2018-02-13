@@ -15,6 +15,6 @@ class Lesson1SurfaceView extends GLSurfaceView {
         setEGLContextClientVersion(2);
         setEGLConfigChooser(8,8,8,8,16,0);
         setRenderer(new Lesson1Renderer());
-        setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);
+        setRenderMode(GLSurfaceView.RENDERMODE_CONTINUOUSLY);
     }
 }
