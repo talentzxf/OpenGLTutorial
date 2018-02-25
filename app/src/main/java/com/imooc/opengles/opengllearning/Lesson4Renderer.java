@@ -5,12 +5,16 @@ import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
 import android.opengl.Matrix;
 
+import com.max3d.core.AbstractBufferList;
 import com.max3d.core.RenderContext;
+import com.max3d.primitives.Plane;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
+import java.util.HashMap;
+import java.util.Map;
 
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
@@ -23,76 +27,16 @@ class Lesson4Renderer implements GLSurfaceView.Renderer {
     private float[] mViewMatrix = new float[16];
     private float[] mProjectionMatrix = new float[16];
     private long startTime = -1;
-    private int mProgram = -1;
-    private Context context;
+
+    private Plane plane;
 
     private float[] lightPos = {
             0.0f, 0.0f, 5.0f, 1.0f
     };
 
-    private float[] vertices = {
-            1.0f, 0.0f, 0.0f,
-            -1.0f, 0.0f, 0.0f,
-            0.0f, 1.0f, 0.0f,
-
-//            2.0f, 0.0f, -1.0f,
-//            -2.0f, 0.0f, -1.0f,
-//            0.0f, 2.0f, -1.0f
-
-            1.0f, 0.0f, 0.0f,
-            -1.0f, 0.0f, 0.0f,
-            0.0f, -1.0f, 0.0f,
-    };
-
-    private int[] faces = {
-            0,1,2,
-            3,4,5
-    };
-
-    private float[] colors = {
-            1.0f, 0.0f, 0.0f,
-            0.1f, 0.8f, 0.2f,
-            0.3f, 0.5f, 0.6f,
-
-            0.0f, 1.0f, 0.0f,
-            0.5f, 0.1f, 0.0f,
-            0.0f, 1.0f, 0.0f,
-    };
-
-    private float[] normals = {
-            0.0f, 0.0f, 1.0f,
-            0.0f, 0.0f, 1.0f,
-            0.0f, 0.0f, 1.0f,
-
-            0.0f, 0.0f, 1.0f,
-            0.0f, 0.0f, 1.0f,
-            0.0f, 0.0f, 1.0f,
-    };
-
-    private FloatBuffer mPositionBuffer;
-    private FloatBuffer mColorBuffer;
-    private FloatBuffer mNormalBuffer;
-    private IntBuffer mFaceBuffer;
-
     Lesson4Renderer(Context context) {
-        this.context = context;
-        RenderContext.getInstance().setContext(this.context);
-
-        mPositionBuffer = ByteBuffer.allocateDirect(vertices.length * 4)
-                .order(ByteOrder.nativeOrder()).asFloatBuffer();
-        mPositionBuffer.put(vertices).position(0);
-
-        mColorBuffer = ByteBuffer.allocateDirect(colors.length * 4)
-                .order(ByteOrder.nativeOrder()).asFloatBuffer();
-        mColorBuffer.put(colors).position(0);
-
-        mNormalBuffer = ByteBuffer.allocateDirect(normals.length * 4)
-                .order(ByteOrder.nativeOrder()).asFloatBuffer();
-        mNormalBuffer.put(normals).position(0);
-
-        mFaceBuffer = ByteBuffer.allocateDirect(faces.length*4)
-                .order(ByteOrder.nativeOrder()).asIntBuffer();
-        mFaceBuffer.put(faces).position(0);
+        RenderContext.getInstance().setContext(context);
+        plane = new Plane(1.0f, 1.0f, 5);
     }
 
     @Override
@@ -114,7 +58,6 @@ class Lesson4Renderer implements GLSurfaceView.Renderer {
         Matrix.setLookAtM(mViewMatrix, 0, eyeX, eyeY, eyeZ,
                 lookX, lookY, lookZ, upX, upY, upZ);
 
-        mProgram = Helper.compileShadersFromAssets(this.context, "shaders/lambert.frag", "shaders/lambert.vert");
         startTime = System.currentTimeMillis();
     }
 
@@ -141,58 +84,19 @@ class Lesson4Renderer implements GLSurfaceView.Renderer {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
         GLES20.glEnable(GLES20.GL_DEPTH_TEST);
 
-        GLES20.glUseProgram(mProgram);
-
         // model matrix
         float[] modelMatrix = new float[16];
         Matrix.setIdentityM(modelMatrix,0);
         long elapsedTime = System.currentTimeMillis() - startTime;
         Matrix.rotateM(modelMatrix,0,elapsedTime/10.0f, 1.0f,1.0f,0.0f);
 
-        // 把modelMatrix 传给u_MMatrix
-        int modelMatrixHandler = GLES20.glGetUniformLocation(mProgram, "u_MMatrix");
-        GLES20.glUniformMatrix4fv(modelMatrixHandler,1,false,modelMatrix,0);
 
-        int viewMatrixHandler = GLES20.glGetUniformLocation(mProgram, "u_VMatrix");
-        GLES20.glUniformMatrix4fv(viewMatrixHandler,1,false,mViewMatrix,0);
-
-        int projectMatrixHandler = GLES20.glGetUniformLocation(mProgram, "u_PMatrix");
-        GLES20.glUniformMatrix4fv(projectMatrixHandler,1,false,mProjectionMatrix,0);
-
-        int lightPosHandler = GLES20.glGetUniformLocation(mProgram,"u_lightPos");
-        GLES20.glUniform4fv(lightPosHandler,1,lightPos,0);
-
-        // 把定点数组赋给a_Position
-        int positionHandler = GLES20.glGetAttribLocation(mProgram,"a_Position");
-
-        GLES20.glVertexAttribPointer(positionHandler,3,GLES20.GL_FLOAT,false,3*4,
-                mPositionBuffer);
-        GLES20.glEnableVertexAttribArray(positionHandler);
-
-        int colorHandler = GLES20.glGetAttribLocation(mProgram,"a_Color");
-        GLES20.glVertexAttribPointer(colorHandler,3,GLES20.GL_FLOAT,false,3*4,
-                mColorBuffer);
-        GLES20.glEnableVertexAttribArray(colorHandler);
-
-        int normalHandler = GLES20.glGetAttribLocation(mProgram,"a_Normal");
-        GLES20.glVertexAttribPointer(normalHandler,3,GLES20.GL_FLOAT,false,3*4,
-                mNormalBuffer);
-        GLES20.glEnableVertexAttribArray(normalHandler);
-
-//        GLES20.glDrawArrays(GLES20.GL_TRIANGLES,0,vertices.length/3);
-        GLES20.glDrawElements(
-                GLES20.GL_TRIANGLES,
-                faces.length,
-                GLES20.GL_UNSIGNED_INT,
-                mFaceBuffer
-
-//                    mObj.getFaces().size() * mObj.getFaces().PROPERTIES_PER_ELEMENT,
-//                    GLES20.GL_UNSIGNED_INT,
-//                    mObj.getFaces().buffer().position(0));
-        );
-
-        GLES20.glDisableVertexAttribArray(positionHandler);
-        GLES20.glDisableVertexAttribArray(colorHandler);
-        GLES20.glDisableVertexAttribArray(normalHandler);
+        Map<String, Object> uniformMap = new HashMap<>();
+        Map<String, AbstractBufferList> attribMap = new HashMap<>();
+        uniformMap.put("u_MMatrix", modelMatrix);
+        uniformMap.put("u_VMatrix", mViewMatrix);
+        uniformMap.put("u_PMatrix", mProjectionMatrix);
+        uniformMap.put("u_lightPos", lightPos);
+        plane.drawObject(uniformMap, attribMap);
     }
 }

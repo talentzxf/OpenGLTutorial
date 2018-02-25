@@ -13,7 +13,7 @@ import java.util.Map;
  */
 
 public class Plane extends ObjectRenderer {
-    Plane(float width, float height, int segsPerEdge) {
+    public Plane(float width, float height, int segsPerEdge) {
         super("shaders/lambert.vert", "shaders/lambert.frag");
 
         int verticeCount = (segsPerEdge + 1) * (segsPerEdge + 1);
