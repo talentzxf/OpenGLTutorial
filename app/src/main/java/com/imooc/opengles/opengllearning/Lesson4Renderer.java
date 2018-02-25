@@ -5,9 +5,12 @@ import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
 import android.opengl.Matrix;
 
+import com.max3d.core.RenderContext;
+
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
+import java.nio.IntBuffer;
 
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
@@ -32,9 +35,18 @@ class Lesson4Renderer implements GLSurfaceView.Renderer {
             -1.0f, 0.0f, 0.0f,
             0.0f, 1.0f, 0.0f,
 
-            2.0f, 0.0f, -1.0f,
-            -2.0f, 0.0f, -1.0f,
-            0.0f, 2.0f, -1.0f
+//            2.0f, 0.0f, -1.0f,
+//            -2.0f, 0.0f, -1.0f,
+//            0.0f, 2.0f, -1.0f
+
+            1.0f, 0.0f, 0.0f,
+            -1.0f, 0.0f, 0.0f,
+            0.0f, -1.0f, 0.0f,
+    };
+
+    private int[] faces = {
+            0,1,2,
+            3,4,5
     };
 
     private float[] colors = {
@@ -60,9 +72,11 @@ class Lesson4Renderer implements GLSurfaceView.Renderer {
     private FloatBuffer mPositionBuffer;
     private FloatBuffer mColorBuffer;
     private FloatBuffer mNormalBuffer;
+    private IntBuffer mFaceBuffer;
 
     Lesson4Renderer(Context context) {
         this.context = context;
+        RenderContext.getInstance().setContext(this.context);
 
         mPositionBuffer = ByteBuffer.allocateDirect(vertices.length * 4)
                 .order(ByteOrder.nativeOrder()).asFloatBuffer();
@@ -75,6 +89,10 @@ class Lesson4Renderer implements GLSurfaceView.Renderer {
         mNormalBuffer = ByteBuffer.allocateDirect(normals.length * 4)
                 .order(ByteOrder.nativeOrder()).asFloatBuffer();
         mNormalBuffer.put(normals).position(0);
+
+        mFaceBuffer = ByteBuffer.allocateDirect(faces.length*4)
+                .order(ByteOrder.nativeOrder()).asIntBuffer();
+        mFaceBuffer.put(faces).position(0);
     }
 
     @Override
@@ -161,7 +179,17 @@ class Lesson4Renderer implements GLSurfaceView.Renderer {
                 mNormalBuffer);
         GLES20.glEnableVertexAttribArray(normalHandler);
 
-        GLES20.glDrawArrays(GLES20.GL_TRIANGLES,0,vertices.length/3);
+//        GLES20.glDrawArrays(GLES20.GL_TRIANGLES,0,vertices.length/3);
+        GLES20.glDrawElements(
+                GLES20.GL_TRIANGLES,
+                faces.length,
+                GLES20.GL_UNSIGNED_INT,
+                mFaceBuffer
+
+//                    mObj.getFaces().size() * mObj.getFaces().PROPERTIES_PER_ELEMENT,
+//                    GLES20.GL_UNSIGNED_INT,
+//                    mObj.getFaces().buffer().position(0));
+        );
 
         GLES20.glDisableVertexAttribArray(positionHandler);
         GLES20.glDisableVertexAttribArray(colorHandler);
